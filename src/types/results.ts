@@ -1,0 +1,7 @@
+export enum TransactionStatus {
+  OK = 'OK',
+  FAILED = 'FAILED',
+  FAILED_INCONSISTENCE = 'FAILED INCONSISTENCE',
+  PENDING_RETRY = 'PENDING RETRY',
+  PENDING = 'PENDING',
+}
