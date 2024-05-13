@@ -2,10 +2,10 @@
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
 </p>
 
-# Financial-control: financial-transaction-processor  
+# Financial-control: financial-movement-service  
 
 La presente iniciativa contiene el codigo de un demo de software BackEnd.
-En particular, este proyecto contiene el modulo denominado financial-transaction-processor.
+En particular, este proyecto contiene el modulo denominado financial-movement-service.
 El presente módulo se responsabiliza en ser el primer eslabon de la cadena de microservicios dentro del manejo de la transaccion distribuida.
 Es totalmente gratuito y compartido como un aporte a la comunidad. 
 Se focalizará en el procesamiento distribuido, mediante la aplicación del enfoque de microservicios con el soporte del pattern Saga Coreografico
