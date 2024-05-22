@@ -87,11 +87,9 @@ export class FinancialMovementService {
               transationError.message,
               errorType,
             );
-            throw transationError;
+            observer.error(transationError);
+            return;
           }
-
-          // Testing for failure forcing exception
-          // throw new Error("Force Excepion");
 
           const financialDataLog = new this.financialDataLogModel(transaction);
           financialDataLog
@@ -100,9 +98,8 @@ export class FinancialMovementService {
               this.sendMessage(KafkaTopics.FMS_SUCCESS, transaction).subscribe({
                 complete: async () => {
                   try {
-                    // Testing for failure forcing exception
-                    // throw new Error("Force Excepion - Fail commit");
                     await session.commitTransaction();
+                    observer.complete();
                   } catch (commitError) {
                     errorType = TransactionStatus.FAILED_INCONSISTENCE;
                     console.error(
@@ -117,11 +114,10 @@ export class FinancialMovementService {
                       commitError.message,
                       errorType,
                     );
-                    throw commitError;
+                    observer.error(commitError);
                   } finally {
                     try {
                       session.endSession();
-                      observer.complete();
                     } catch (endSessionError) {
                       console.error(
                         'Failed to end session id:',
@@ -129,7 +125,7 @@ export class FinancialMovementService {
                         ' error: ',
                         endSessionError,
                       );
-                      throw endSessionError;
+                      observer.error(endSessionError);
                     }
                   }
                 },
@@ -148,7 +144,7 @@ export class FinancialMovementService {
                     sendError.message,
                     errorType,
                   );
-                  throw sendError;
+                  observer.error(sendError);
                 },
               });
             })
@@ -165,12 +161,12 @@ export class FinancialMovementService {
                 saveError.message,
                 errorType,
               );
-              throw saveError;
+              observer.error(saveError);
             });
         })
         .catch((sessionError) => {
           this.handleError(null, transaction, sessionError.message, errorType);
-          throw sessionError;
+          observer.error(sessionError);
         });
     }).pipe(
       catchError((error) => {
@@ -191,6 +187,40 @@ export class FinancialMovementService {
     const transaction: TransactionDto = JSON.parse(message);
     console.log('---------------------------------------------');
     console.log('handleCompensation start - transaction: ', transaction);
+
+    // Start - Test case compensation with failure -------------------
+    if (
+      transaction.credit_card_number &&
+      transaction.credit_card_number === '4444444444'
+    ) {
+      console.log(
+        'Test Case - Force Fail & Compensation with failure workflow',
+      );
+      this.handleError(
+        null,
+        transaction,
+        'Test Case - Force Fail & Compensation with failure workflow',
+        TransactionStatus.FAILED_INCONSISTENCE,
+      );
+      return new Observable<void>((observer) => {
+        observer.error(
+          new Error(
+            'Test Case - Force Fail & Compensation with failure workflow',
+          ),
+        );
+      }).pipe(
+        catchError((error) => {
+          console.error(
+            'Test case failure in handleCompensation transaction id:',
+            transaction.id,
+            ' error: ',
+            error,
+          );
+          return EMPTY;
+        }),
+      );
+    }
+    // End - Test case compensation with failure-------------------
 
     return new Observable<void>((observer) => {
       this.financialDataLogModel
@@ -215,9 +245,19 @@ export class FinancialMovementService {
             error.message,
             TransactionStatus.FAILED_INCONSISTENCE,
           );
-          return EMPTY;
+          observer.error(error);
         });
-    });
+    }).pipe(
+      catchError((error) => {
+        console.error(
+          'Failure in handleCompensation transaction id:',
+          transaction.id,
+          ' error: ',
+          error,
+        );
+        return EMPTY;
+      }),
+    );
   }
 
   // -----------------------------------------------------------------
@@ -244,6 +284,22 @@ export class FinancialMovementService {
             transaction: transaction,
             movements: dataLogs,
           };
+
+          // Start - Test case compensation -------------------
+          if (
+            transaction.credit_card_number &&
+            transaction.credit_card_number === '3333333333'
+          ) {
+            console.log(
+              'Test Case - Force Fail & Compensation workflow - transaction id:',
+              transaction.id,
+            );
+            observer.error(
+              new Error('Test Case - Force Fail & Compensation workflow'),
+            );
+          }
+          // End - Test case compensation -------------------
+
           console.log('----------------------------------------------');
           console.log('handleMovements response messages: ', messages);
           this.sendMessage(
@@ -260,7 +316,7 @@ export class FinancialMovementService {
                 error.message,
                 TransactionStatus.FAILED,
               );
-              throw error;
+              observer.error(error);
             },
           });
         })
@@ -290,7 +346,7 @@ export class FinancialMovementService {
                 error.message,
                 TransactionStatus.FAILED,
               );
-              throw error;
+              observer.error(error);
             },
           });
         });
@@ -349,18 +405,27 @@ export class FinancialMovementService {
         } finally {
           resolve();
         }
-      }).then(async () => {
-        try {
-          await session.endSession();
-        } catch (endSessionError) {
+      })
+        .then(async () => {
+          try {
+            await session.endSession();
+          } catch (endSessionError) {
+            console.error(
+              'Failed to end session transaction.id:',
+              transaction.id,
+              ' error: ',
+              endSessionError,
+            );
+          }
+        })
+        .catch((finalError) => {
           console.error(
-            'Failed to end session transaction.id:',
+            'Error during transaction finalization - transaction id:',
             transaction.id,
             ' error: ',
-            endSessionError,
+            finalError,
           );
-        }
-      });
+        });
     }
 
     console.error(
